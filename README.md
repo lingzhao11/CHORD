@@ -13,8 +13,8 @@ CHORD/
 ├── chord.py                         # The core algorithm and visualization script (All-in-one)
 └── data/                            # Sample datasets for testing
     ├── simulated_data.txt           # Simulated Hi-C matrix for algorithmic validation
-    ├── mat_100k_KR_p_arm.txt        # GM12878 Chr7 (0-58.1Mb) at 100kb resolution 
-    └── mat_50k_KR_chr7_23_27Mb.txt  # High-resolution sub-matrix of Chr7 (23-27Mb) at 50kb 
+    ├── hic_sample_100k.txt        
+    └── hic_sample_50k.txt  
 ```
 
 ## ⚙️ Requirements
@@ -36,7 +36,7 @@ CHORD requires a normalized intra-chromosomal Hi-C contact matrix as input (tab 
 By default, CHORD operates entirely parameter-free. It uses the Silhouette Score to automatically determine the mathematically optimal number of structural domains across the input matrix.
 
 ```bash
-python chord.py --matrix data/mat_100k_KR_p_arm.txt --out_boundary result.txt --out_image tad_heatmap.png
+python chord.py --matrix data/hic_sample_100k.txt --out_boundary result.txt --out_image tad_heatmap.png
 ```
 
 ### 2. Advanced Usage: Localized Customized Exploration
@@ -45,7 +45,7 @@ While CHORD perfectly captures the global mathematical optimum for large-scale m
 This allows users to bypass the automatic selection and manually specify the desired number of domains for targeted structural dissection:
 
 ```bash
-python chord.py --matrix data/mat_50k_KR_chr7_23_27Mb.txt --k 14 
+python chord.py --matrix data/hic_sample_50k.txt --k 14 
 ```
 
 ### Command Line Arguments
