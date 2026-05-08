@@ -13,10 +13,10 @@ CHORD/
 ├── chord.py                         # The core algorithm and visualization script (All-in-one)
 └── data/                            # Sample datasets for testing
     ├── simulated_data.txt           # Simulated Hi-C matrix for algorithmic validation
-    ├── mat_100k_KR_p_arm.txt        # GM12878 Chr7 (0-58.1Mb) at 100kb resolution
-    └── mat_50k_KR_chr7_23_27Mb.txt  # High-resolution sub-matrix of Chr7 (23-27Mb) at 50kb
+    ├── mat_100k_KR_p_arm.txt        # GM12878 Chr7 (0-58.1Mb) at 100kb resolution (KR normalized)
+    └── mat_50k_KR_chr7_23_27Mb.txt  # High-resolution sub-matrix of Chr7 (23-27Mb) at 50kb (KR normalized)
 
-⚙️ Requirements
+```⚙️ Requirements
 CHORD is developed using Python 3.11 and requires minimal external dependencies.
 Please ensure the following packages are installed in your environment:
 
