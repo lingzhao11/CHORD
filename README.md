@@ -20,15 +20,15 @@ CHORD/
 CHORD is developed using Python 3.11 and requires minimal external dependencies.
 Please ensure the following packages are installed in your environment:
 
-numpy
+* numpy
 
-scikit-learn
+* scikit-learn
 
-matplotlib
+* matplotlib
 
-seaborn
+* seaborn
 
-tqdm
+* tqdm
 
-🚀 Usage
+## 🚀 Usage
 CHORD requires a normalized intra-chromosomal Hi-C contact matrix as input (tab or space-separated pure numeric text file, without headers or bin annotations).
