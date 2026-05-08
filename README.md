@@ -15,17 +15,3 @@ CHORD/
     ├── simulated_data.txt           # Simulated Hi-C matrix for algorithmic validation
     ├── mat_100k_KR_p_arm.txt        # GM12878 Chr7 (0-58.1Mb) at 100kb resolution
     └── mat_50k_KR_chr7_23_27Mb.txt  # High-resolution sub-matrix of Chr7 (23-27Mb) at 50kb
-
-## ⚙️ Requirements
-CHORD is developed using Python 3.11 and requires minimal external dependencies.
-Please ensure the following packages are installed in your environment:
-
-numpy
-
-scikit-learn
-
-matplotlib
-
-seaborn
-
-tqdm
