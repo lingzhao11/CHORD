@@ -2,7 +2,7 @@ import numpy as np
 import argparse
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
 from tqdm import tqdm
 
 class CHORD:
@@ -30,20 +30,21 @@ class CHORD:
 
     def _cal_avesum(self):
         """
-        Calculate the average sum of each TAD in the Hi-C matrix.
+        Calculate the sum of squared mean interactions (variance-like metric) 
+        for each possible TAD block to pre-populate the lookup table.
         """
         bin_sum = np.zeros((self.n_bins, self.n_bins))
         ave_value = np.average(self.mat, axis=0)
         norm_mat = self.mat - ave_value
 
-        # Compute cumulative sums using norm_mat
+        # Compute 2D cumulative sums using normalized matrix
         for start in range(self.n_bins):
             if start == 0:
                 bin_sum[start, :] = norm_mat[start, :]
             else:
                 bin_sum[start, :] = norm_mat[start, :] + bin_sum[start - 1, :]
                 
-        # Calculate the variance-like metric for each possible TAD block
+        # Calculate the objective metric for each possible block in O(1) time
         for start in range(self.n_bins):
             for end in range(start, self.n_bins, 1):
                 if start == 0:
@@ -55,7 +56,8 @@ class CHORD:
 
     def fit(self):
         """
-        Main solver using dynamic programming to populate the optimal split tables.
+        Main solver utilizing dynamic programming to rigorously explore 
+        the global optimum partition landscape.
         """
         self._cal_avesum()
         
@@ -74,7 +76,7 @@ class CHORD:
 
     def _get_boundaries(self, k):
         """
-        Backtrace the dynamic programming table to extract breakpoints for a specific K.
+        Backtrace the DP table to extract exact breakpoints for a specific K.
         """
         c_idx = k - 1  # 0-based cluster index
         boundaries = []
@@ -99,9 +101,17 @@ class CHORD:
     def find_optimal_k(self):
         """
         Evaluate all possible K values using the Silhouette Score and return the best one.
+        Incorporates a dynamic pseudocount to mitigate sparsity in high-res Hi-C matrices.
         """
-        # Create distance matrix (prune=1e-6 to avoid division by zero)
-        distance_arr = 1 / (self.mat + 1e-6)
+        # Dynamic pseudocount based on non-zero mean to prevent distance explosion
+        nonzero_mask = self.mat > 0
+        if np.any(nonzero_mask):
+            dynamic_prune = np.mean(self.mat[nonzero_mask])
+        else:
+            dynamic_prune = 1e-6
+
+        # Convert contact matrix to distance matrix
+        distance_arr = 1 / (self.mat + dynamic_prune)
         np.fill_diagonal(distance_arr, 0)
 
         best_k = 2
@@ -134,8 +144,7 @@ class CHORD:
 
     def get_tad_domains(self, force_k=None):
         """
-        Convert breakpoints into a list of 1-based, Start-End TAD pairs.
-        If force_k is provided, bypass the Silhouette Score selection.
+        Convert breakpoints into a list of 1-based (Start, End) TAD bin indices.
         """
         if force_k is not None:
             self.optimal_k = force_k
@@ -163,6 +172,7 @@ class CHORD:
 # --- Plotting Module ---
 
 def squeeze_outliers(mat, percent=99):
+    """Cap extreme values for better heatmap visualization."""
     percentile = np.percentile(mat.flatten(), percent)
     op_percentile = np.percentile(mat.flatten(), 100 - percent)
     mat_copy = mat.copy()
@@ -171,6 +181,7 @@ def squeeze_outliers(mat, percent=99):
     return mat_copy
 
 def plot_tad_heatmap(matrix, boundaries, method_name="CHORD", output_file="tad_heatmap.png", cmap="Reds"):
+    """Plot the Hi-C contact matrix overlaid with predicted TAD boundaries."""
     fig, ax = plt.subplots(figsize=(12, 10))
 
     mat_plot = squeeze_outliers(matrix)
@@ -209,46 +220,58 @@ def plot_tad_heatmap(matrix, boundaries, method_name="CHORD", output_file="tad_h
 def main():
     parser = argparse.ArgumentParser(description="CHORD: Deterministic Demarcation of TADs via Exact Optimization")
     parser.add_argument("--matrix", dest="matrix", type=str, required=True, help="Path to the input Hi-C matrix file")
-    parser.add_argument("--k", dest="k", type=int, default=None, help="Force a specific number of TADs (bypasses automatic Silhouette selection)")
-    parser.add_argument("--out_boundary", dest="out_boundary", type=str, default="result.txt", help="Output filename for the TAD boundaries")
-    parser.add_argument("--out_image", dest="out_image", type=str, default="tad_heatmap.png", help="Output filename for the heatmap image")
+    parser.add_argument("--k", dest="k", type=int, default=None, help="Force a specific number of TADs")
+    parser.add_argument("--out_boundary", dest="out_boundary", type=str, default="result.txt", help="Output boundary file")
+    parser.add_argument("--out_image", dest="out_image", type=str, default="tad_heatmap.png", help="Output heatmap image file")
     parser.add_argument("--cmap", dest="cmap", type=str, default="Reds", help="Colormap for the heatmap")
     
     args = parser.parse_args()
 
-    # Load matrix with error handling
+    # Load matrix
     try:
-        print(f"Loading matrix from: {args.matrix} ...")
+        print(f"[*] Loading matrix from: {args.matrix} ...")
         mat = np.loadtxt(args.matrix)
     except Exception as e:
         print(f"\n[ERROR] Failed to load matrix: {e}")
-        print("Please ensure your input is a pure numeric text file (tab or space separated) without headers, strings, or missing values.")
         return
 
-    print("Running DP Solver...")
+    print("[*] Running Exact DP Solver...")
     mod = CHORD(mat)
     mod.fit()
 
     if args.k:
-        print(f"Extracting domains for user-defined K={args.k} (bypassing automatic selection)...")
+        print(f"[*] Extracting domains for user-defined K={args.k}...")
     else:
-        print("Evaluating optimal K using Silhouette Score...")
+        print("[*] Automatically evaluating optimal K via Silhouette Score...")
         
     tads = mod.get_tad_domains(force_k=args.k)
     
-    # Write results to output file (Bin indexing only)
+    # 1. Output Domain Information
+    print("-" * 50)
+    print(f"✅ Total number of identified domains: {len(tads)}")
+    
+    # 2. Calculate and output true Calinski-Harabasz (CH) Index using original matrix
+    if len(tads) > 1:
+        labels = np.zeros(mat.shape[0])
+        for idx, (start_bin, end_bin) in enumerate(tads):
+            labels[start_bin - 1 : end_bin] = idx
+        
+        ch_score = calinski_harabasz_score(mat, labels)
+        print(f"✅ Optimal Calinski-Harabasz (CH) Index: {ch_score:.4f}")
+    print("-" * 50)
+
+    # 3. Write boundaries to file
     with open(args.out_boundary, "w") as f:
         f.write("Start_Bin\tEnd_Bin\n") 
         for start_bin, end_bin in tads:
             f.write(f"{start_bin}\t{end_bin}\n")
-            
-    print(f"Successfully saved {len(tads)} domains to {args.out_boundary}")
+    print(f"[*] Saved boundaries to {args.out_boundary}")
 
-    # Plot the results
-    print("Plotting heatmap with bounding boxes...")
+    # 4. Plot Heatmap
+    print("[*] Generating TAD heatmap visualization...")
     plot_tad_heatmap(matrix=mat, boundaries=tads, method_name="CHORD", output_file=args.out_image, cmap=args.cmap)
-    print(f"Heatmap saved to {args.out_image}")
-    print("Done!")
+    
+    print("[*] All tasks completed successfully!")
 
 if __name__ == '__main__':
     main()
